@@ -2,6 +2,7 @@
 
 read -p "请输入目标内网IP地址: " destination_ip
 read -p "请输入本机内网IP地址: " local_ip
+read -p "请输入限制带宽大小（单位：Mbps）: " bandwidth_limit
 
 # 清空现有的规则和链
 iptables -F
@@ -22,6 +23,13 @@ iptables -t nat -A PREROUTING -p udp --dport 1025:65535 -j DNAT --to-destination
 # 配置POSTROUTING链，将来自目标内网IP的响应流量进行SNAT，将源地址设置为本机内网IP
 iptables -t nat -A POSTROUTING -p tcp -d "$destination_ip" --dport 1025:65535 -j SNAT --to-source "$local_ip"
 iptables -t nat -A POSTROUTING -p udp -d "$destination_ip" --dport 1025:65535 -j SNAT --to-source "$local_ip"
+
+# 将Mbps转换为kbps（1 Mbps = 1000 kbps）
+bandwidth_limit_kbps=$((bandwidth_limit * 1000))
+
+# 添加限速规则，将端口1025-65535的流量限制为指定的带宽大小
+iptables -A FORWARD -p tcp --dport 1025:65535 -m limit --limit "$bandwidth_limit_kbps"k -j ACCEPT
+iptables -A FORWARD -p udp --dport 1025:65535 -m limit --limit "$bandwidth_limit_kbps"k -j ACCEPT
 
 # 保存规则
 mkdir -p /etc/iptables/
