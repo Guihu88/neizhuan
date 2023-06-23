@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# 允许SSH连接的流量通过
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
 read -p "请输入目标内网IP地址: " destination_ip
 read -p "请输入本机内网IP地址: " local_ip
 read -p "请输入限速大小（例如50M）: " bandwidth
@@ -38,5 +41,9 @@ iptables-save > /etc/iptables/rules.v4
 # 保存tc规则
 tc qdisc save dev eth0 root > /etc/systemd/system/tc.service
 systemctl enable tc.service
+
+# 安装iptables-persistent以永久保存规则
+apt-get update
+apt-get install -y iptables-persistent
 
 echo "内网传输配置完成。"
