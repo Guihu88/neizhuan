@@ -16,6 +16,11 @@ iptables -P OUTPUT ACCEPT
 # 启用IP转发
 sysctl -w net.ipv4.ip_forward=1
 
+# 添加tc限速规则
+tc qdisc add dev eth0 root handle 1: htb default 10
+tc class add dev eth0 parent 1: classid 1:1 htb rate ${bandwidth_limit}mbps burst 15k
+tc filter add dev eth0 parent 1: protocol ip prio 1 u32 match ip dst ${destination_ip} flowid 1:1
+
 # 配置PREROUTING链，将指定端口的流量进行DNAT到目标内网IP
 iptables -t nat -A PREROUTING -p tcp --dport 1025:65535 -j DNAT --to-destination "$destination_ip"
 iptables -t nat -A PREROUTING -p udp --dport 1025:65535 -j DNAT --to-destination "$destination_ip"
@@ -23,13 +28,6 @@ iptables -t nat -A PREROUTING -p udp --dport 1025:65535 -j DNAT --to-destination
 # 配置POSTROUTING链，将来自目标内网IP的响应流量进行SNAT，将源地址设置为本机内网IP
 iptables -t nat -A POSTROUTING -p tcp -d "$destination_ip" --dport 1025:65535 -j SNAT --to-source "$local_ip"
 iptables -t nat -A POSTROUTING -p udp -d "$destination_ip" --dport 1025:65535 -j SNAT --to-source "$local_ip"
-
-# 将Mbps转换为kbps（1 Mbps = 1000 kbps）
-bandwidth_limit_kbps=$((bandwidth_limit * 1000))
-
-# 添加限速规则，将端口1025-65535的流量限制为指定的带宽大小
-iptables -A FORWARD -p tcp --dport 1025:65535 -m limit --limit "$bandwidth_limit_kbps"k -j ACCEPT
-iptables -A FORWARD -p udp --dport 1025:65535 -m limit --limit "$bandwidth_limit_kbps"k -j ACCEPT
 
 # 保存规则
 mkdir -p /etc/iptables/
